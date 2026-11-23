@@ -1,0 +1,11 @@
+{
+  "name": "votacion-estudiantil",
+  "version": "1.0.0",
+  "description": "Plataforma de votación estudiantil en alta disponibilidad (Clase 36 - GSW)",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}
