@@ -15,10 +15,10 @@ corren en un clúster de 3 nodos detrás de un balanceador Nginx.
 Usuario (navegador / curl)
    |
    v   http://localhost:8089          <- único puerto abierto hacia afuera
-[ lb: Nginx 1.29 ]
+[ lb: Nginx ]
    |   red privada clusternet
    +------> nodo1:9095 ┐
-   +------> nodo2:9095 ├── volumen compartido "votos"
+   +------> nodo2:9095 ├── carpeta compartida ./datos (votos)
    +------> nodo3:9095 ┘
 ```
 
@@ -35,7 +35,13 @@ git clone https://github.com/manasesortez/Clase-36-GSW-Ejercicio-SeccionA.git
 cd Clase-36-GSW-Ejercicio-SeccionA
 ```
 
-**Antes de levantar**, crear `nginx/nginx.conf` con el contenido de la guía de la clase:
+**1. Construir la imagen de los nodos** (como `blog.local` en las clases anteriores):
+
+```bash
+docker build -t votacion-a-app ./app
+```
+
+**2. Antes de levantar**, crear `nginx/nginx.conf` con el contenido de la guía de la clase:
 
 ```powershell
 # Windows
@@ -53,10 +59,10 @@ nano nginx/nginx.conf
 > balanceador no arranca (`not a directory`). Solución: `docker compose down`, borrar esa carpeta y crear
 > el archivo.
 
-Luego levantar y validar el balanceador:
+**3. Levantar** y validar el balanceador:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 docker compose exec lb nginx -t
 docker compose ps
 ```
@@ -67,7 +73,7 @@ Abrir **http://localhost:8089** en el navegador.
 
 ```
 .
-├── docker-compose.yml     # 3 nodos + lb, red clusternet, volumen votos, healthchecks
+├── docker-compose.yml     # 3 nodos + lb, red clusternet, healthchecks (solo lo visto en clase)
 ├── nginx/nginx.conf       # (lo crea el estudiante, no viene en el repo)
 ├── app/
 │   ├── Dockerfile         # node:22-alpine, sin dependencias externas
@@ -112,24 +118,25 @@ docker compose start nodo2
 
 ## Decisiones de diseño
 
-Las de Nginx (`zone`, `proxy_connect_timeout`, IPs fijas + `extra_hosts`) se aplican con el `nginx.conf`
-que escribe el estudiante.
-
+- **`docker-compose.yml` solo con lo visto en las Clases 31 a 35:** `image`, `hostname`, `ports`, `volumes`,
+  `networks` con `ipv4_address`, `healthcheck` (`test`, `interval`, `retries`), `depends_on` e `ipam`.
 - **Solo `lb` publica un puerto.** Los nodos no tienen `ports:`; solo se alcanzan por `clusternet`.
-- **`zone` en el `upstream`**: los workers de Nginx comparten el turno del Round Robin (sin esto, peticiones
-  sueltas caen siempre en `nodo1`).
+- **Carpeta `./datos` compartida**: los 3 nodos montan la misma carpeta, así todos ven los mismos resultados.
+  El bloqueo de voto doble usa la creación atómica de un archivo por carnet, así que no hay votos dobles
+  aunque lleguen a nodos distintos.
+- **El nombre del nodo sale de `hostname`**: la app responde con el `hostname` del contenedor (`nodo1`...).
+
+Las de Nginx se aplican con el `nginx.conf` que escribe el estudiante:
+
+- **`zone` en el `upstream`**: los workers de Nginx comparten el turno del Round Robin.
 - **`proxy_connect_timeout 2s`**: un nodo apagado se detecta en 2 s y no en los 60 s por defecto.
-- **IPs fijas + `extra_hosts` en `lb`**: Nginx lee `nodo1..3` de su `/etc/hosts`, así arranca y se
-  reinicia aunque un nodo esté apagado (sin el error `host not found in upstream`). Se descartó
-  `resolve` (DNS dinámico): en las pruebas producía un 502 ocasional al apagar un nodo.
-- **Volumen `votos` compartido**: todos los nodos ven los mismos resultados. El bloqueo de voto doble usa
-  la creación atómica de un archivo por carnet, así que no hay votos dobles aunque lleguen a nodos distintos.
-- **`depends_on: service_healthy`**: el balanceador arranca cuando los 3 nodos ya pasaron su health check.
-- **Apagado limpio (SIGTERM)**: `docker compose stop nodo2` tarda ~1 s, no 10 s.
+- **Nodos por IP fija** (`172.22.0.11`–`.13`) en lugar de por nombre: Nginx arranca y se reinicia aunque un
+  nodo esté apagado (sin el error `host not found in upstream` de la Clase 35).
 
 ## Apagar
 
 ```bash
-docker compose down        # conserva los votos
-docker compose down -v     # borra también los votos
+docker compose down        # los votos quedan en la carpeta datos/
 ```
+
+Para borrar los votos, borrar la carpeta `datos/` después del `down`.

@@ -5,10 +5,9 @@ WORKDIR /app
 COPY package.json server.js ./
 COPY public ./public
 
-# Carpeta de datos (se monta como volumen compartido entre los 3 nodos)
-RUN mkdir -p /app/data && chown -R node:node /app/data
+# Carpeta de datos (en docker-compose.yml se monta ./datos aquí, compartida entre los 3 nodos)
+RUN mkdir -p /app/data
 
-USER node
 ENV PORT=9095
 EXPOSE 9095
 

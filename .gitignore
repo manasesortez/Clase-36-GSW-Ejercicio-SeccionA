@@ -4,3 +4,4 @@ app/data/
 .DS_Store
 Thumbs.db
 nginx/nginx.conf
+datos/
